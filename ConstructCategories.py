@@ -1,102 +1,138 @@
 import os,re, pickle
+from collections import Counter
+from Utils import Utils
+import json
+import multiprocessing as mp
+import random
+import itertools
 
 ## SETTINGS
 numberOfLearningArticlesInSubset = 900;
-numberOfLearningArticles = 900*20;
-
-def createSubCat():
-
-    dictList=['comp.graphics','comp.os.ms-windows.misc','comp.sys.ibm.pc.hardware','comp.sys.mac.hardware','comp.windows.x',
-    'misc.forsale','rec.autos','rec.motorcycles','rec.sport.baseball','rec.sport.hockey','sci.crypt','sci.electronics',
-    'sci.med','sci.space','soc.religion.christian','talk.politics.guns','talk.politics.mideast','talk.politics.misc','talk.religion.misc']
-
-    for x in range(len(dictList)):
-        print ('Run %x' % x)
-        # Calculate P(hj) -> numberOfArticlesInSubset / TotalArticlesInExamples
-        pHj = numberOfLearningArticlesInSubset / numberOfLearningArticles
+numberOfLearningArticles = 900 * 20;
 
 
-        # Combine all text from all examples to a string
-        print(dictList[x])
-        ## Get all articles for a subcategory, take n articles, and leave n for testing.
-        listOfWord = getExampleArticlesFromSubCat('dict/%s' % (dictList[x]))
-        ## Number of words in subset called n
-        numberOfWordsInSubset = len(listOfWord)
+### Main Dictionary
+## Load our predefined dictionary
+f = open('mainDict.txt','r')
+output = f.read()
+referenceDict = pickle.loads(output)
+f.close()
 
 
-
-        ## Load our predefined dictionary
-        with open('mainDict.txt','r') as f:
-            output = f.read()
-            referenceDict = pickle.loads(output)
-
-        ## Iterate each word in the vocabulary / referenceDict
-        numOfIter = 0
-        for word in referenceDict:
-            nForWord = listOfWord.count(word)
-            # Variables
-            numberOfTotalWords = len(listOfWord)
-            numbertOfDictWords = len(referenceDict)
-
-            # Calculate percentage
-            pForWord = (nForWord+1)/float((numberOfTotalWords+numbertOfDictWords))
-            referenceDict[word] = pForWord
-
-            # Save subcat to file..
-
-        pickle.dump(referenceDict, open( "%s.txt" % (dictList[x]), "wb" ))
-        print(referenceDict)
-
-
-
-    # For each word, calculate (Wk|Hj) and construct the final dict with prob.
-
-
-
-
+	
 def getExampleArticlesFromSubCat(subcat):
+	# Ex: subcat  = dict/rec.autos
 
-    # Pick n-learning articles from subset.
-    lst=os.listdir(subcat)
-    lst = lst[:numberOfLearningArticlesInSubset]
+	# Pick n-learning articles from subset.
+	lst = os.listdir(subcat)
+	lst = lst[:numberOfLearningArticlesInSubset]
 
-    # Open each file and add it to a list of wooooords.
-    subsetWords = [""]
+	# Open each file and add it to a list of wooooords.
+	subsetWords = []
 
-    for fname in lst:
-        subsetWords.extend(testStripping(subcat+"/"+fname))
+	for fname in lst:
+		subsetWords.extend(Utils.testStripping(subcat + "/" + fname))
 
-    # Many words we got, time to do some counting.
-    print("Subset word count : ", len(subsetWords))
-    return subsetWords
+	# Many words we got, time to do some counting.
+	print("Subset word count: ", len(subsetWords))
+	return subsetWords
 
-# Same stripping method as in MakeDictionary - keep this shit consistent. Does not del dupes..
-def testStripping(openFile):
-    bad_words = ['Xref:',
-    'Path:',"From:","Newsgroups:",
-    "Subject:","Summary:","Keywords:",
-    "Message-ID:","Date:","Expires:",
-    "Followup-To:","Distribution:",
-    "Organization:","Approved:",
-    "Supersedes:","Lines:",
-    "Archive-name:",
-    "Alt-atheism-archive-name:",
-    "Last-modified:",
-    "Version: 1.0",
-    "NNTP-Posting-Host:",
-    "References:","Article-I.D.:","Reply-To:","Sender:",
-    "X-Newsreader:","Nntp-Posting-Host:"]
-    result = ""
+categories = [
+	'comp.graphics',
+	'comp.os.ms-windows.misc',
+	'comp.sys.ibm.pc.hardware',
+	'comp.sys.mac.hardware',
+	'comp.windows.x',
+	'misc.forsale',
+	'rec.autos',
+	'rec.motorcycles',
+	'rec.sport.baseball',
+	'rec.sport.hockey',
+	'sci.crypt',
+	'sci.electronics',
+	'sci.med',
+	'sci.space',
+	'soc.religion.christian',
+	'talk.politics.guns',
+	'talk.politics.mideast',
+	'talk.politics.misc',
+	'talk.religion.misc'
+]
+	
+def mp_calculate(sublist, refDict, refTotal, categoryTotal, randId):
 
-    with open(openFile) as oldfile:
-        for line in oldfile:
-            if not any(bad_word in line for bad_word in bad_words):
-                result+=line;
+	result = {}
+	
+
+	print("Starting: " + str(randId))
+	for word in refDict:
+		nForWord = sublist.count(word)
+
+		# Calculate percentage
+		pForWord = (nForWord + 1) / float(categoryTotal + refTotal)
+		result[word] = pForWord
+
+	return result
+
+	
+def mp_handler(categories):
+
+	data = []
+	
+	# Calculate P(hj) -> numberOfArticlesInSubset / TotalArticlesInExamples
+	pHj = numberOfLearningArticlesInSubset / numberOfLearningArticles # 0.05
 
 
-    result = result.lower()
-    match = re.compile('[A-Za-z]+').findall(result)
-    return match
+	for category in categories:
+		print ('Run %s' % category)
+		
+		
+		item = {}
+		item['category'] = category
+		item['words'] = []
 
-print("Y2O")
-createSubCat();
+
+		## Get all articles for a subcategory, take n articles, and leave n for testing.
+		item['words'] = getExampleArticlesFromSubCat('dict/%s' % (category))
+		
+		
+		data.append(item)
+		
+
+	
+	for item in data:
+	
+		# Create process pool
+		pool = mp.Pool(processes=8)
+		
+		# Create X processes and input chunk of words to process
+		results = [pool.apply_async(mp_calculate, args=(x, referenceDict, len(referenceDict), len(item['words']), random.random())) for x in Utils.chunks(item['words'], 8)]
+		output = [p.get() for p in results]
+		
+		completeDict = referenceDict.copy()
+		for subDict in output:
+			for (key, val) in subDict.items():
+				completeDict[key] = completeDict[key] + val
+	
+		
+		# Save training data file
+		print("Saving: " + item['category'] + " which had " + str(len(item['words'])))
+		with open( "%s.json" % (item['category']), "w" ) as outfile:
+			json.dump(completeDict, outfile)
+		
+		
+		
+
+	
+	
+	
+	
+	
+	
+	
+	
+	
+if __name__ == '__main__':
+	mp_handler(categories)
+
+
