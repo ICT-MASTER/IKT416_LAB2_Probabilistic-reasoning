@@ -56,7 +56,9 @@ def classification():
 			'p' : 0
 		}
 
-		for word in getTextDocument('./dict/rec.autos/101561'):
+		
+		
+		for word in getTextDocument('./dict/rec.autos/101563'):
 			if word in refDict.keys():
 				result['hits'] += 1
 				result['p'] += refDict[word]

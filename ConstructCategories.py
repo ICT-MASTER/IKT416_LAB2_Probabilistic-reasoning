@@ -2,9 +2,11 @@ import os,re, pickle
 from collections import Counter
 from Utils import Utils
 import json
+import pickle
 import multiprocessing as mp
 import random
 import itertools
+import time
 
 ## SETTINGS
 numberOfLearningArticlesInSubset = 900;
@@ -17,7 +19,6 @@ f = open('mainDict.txt','r')
 output = f.read()
 referenceDict = pickle.loads(output)
 f.close()
-
 
 	
 def getExampleArticlesFromSubCat(subcat):
@@ -37,45 +38,19 @@ def getExampleArticlesFromSubCat(subcat):
 	print("Subset word count: ", len(subsetWords))
 	return subsetWords
 
-categories = [
-	'comp.graphics',
-	'comp.os.ms-windows.misc',
-	'comp.sys.ibm.pc.hardware',
-	'comp.sys.mac.hardware',
-	'comp.windows.x',
-	'misc.forsale',
-	'rec.autos',
-	'rec.motorcycles',
-	'rec.sport.baseball',
-	'rec.sport.hockey',
-	'sci.crypt',
-	'sci.electronics',
-	'sci.med',
-	'sci.space',
-	'soc.religion.christian',
-	'talk.politics.guns',
-	'talk.politics.mideast',
-	'talk.politics.misc',
-	'talk.religion.misc'
-]
-	
+
 def mp_calculate(sublist, refDict, refTotal, categoryTotal, randId):
 
 	result = {}
-	
-
 	print("Starting: " + str(randId))
 	for word in refDict:
 		nForWord = sublist.count(word)
-
-		# Calculate percentage
-		pForWord = (nForWord + 1) / float(categoryTotal + refTotal)
-		result[word] = pForWord
-
+		result[word] = nForWord
+	print("Done: " + str(randId))
 	return result
 
 	
-def mp_handler(categories):
+def mp_handler():
 
 	data = []
 	
@@ -83,7 +58,7 @@ def mp_handler(categories):
 	pHj = numberOfLearningArticlesInSubset / numberOfLearningArticles # 0.05
 
 
-	for category in categories:
+	for category in os.listdir('./dict'):
 		print ('Run %s' % category)
 		
 		
@@ -106,19 +81,31 @@ def mp_handler(categories):
 		pool = mp.Pool(processes=8)
 		
 		# Create X processes and input chunk of words to process
+		startTime = time.time()
 		results = [pool.apply_async(mp_calculate, args=(x, referenceDict, len(referenceDict), len(item['words']), random.random())) for x in Utils.chunks(item['words'], 8)]
 		output = [p.get() for p in results]
+		endTime = time.time() - startTime
+		print("Execution Time: " + str(endTime))
 		
+		
+		# Sum up all occurences of the word in all the sublists
 		completeDict = referenceDict.copy()
 		for subDict in output:
 			for (key, val) in subDict.items():
 				completeDict[key] = completeDict[key] + val
+				
+				
+		result = {}
+		for (word, occurences) in completeDict.items():
+			pForWord = (occurences + 1) / float(len(item['words']) + len(referenceDict))
+			result[word] = pForWord
+			
 	
 		
 		# Save training data file
 		print("Saving: " + item['category'] + " which had " + str(len(item['words'])))
 		with open( "%s.json" % (item['category']), "w" ) as outfile:
-			json.dump(completeDict, outfile)
+			json.dump(result, outfile)
 		
 		
 		
@@ -133,6 +120,6 @@ def mp_handler(categories):
 	
 	
 if __name__ == '__main__':
-	mp_handler(categories)
+	mp_handler()
 
 
