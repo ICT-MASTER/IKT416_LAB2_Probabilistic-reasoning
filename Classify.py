@@ -4,10 +4,11 @@ from os import walk
 from Utils import Utils
 import multiprocessing as mp
 import random
+import math
 
 dictionary_path = "./dict"
 pool_size = 8 #mp.cpu_count()
-
+shared_dict = None
 
 
 
@@ -20,8 +21,8 @@ def sp_getDictionaries():
 			
             # Construct full path
             fullPath = dirpath + "/" + filename
-			
-            print("Loading %s...") % (filename)
+		
+            print("Loading "+filename+"...")
 
 			# Load reference dict
             data = json.load(open(fullPath, "r"))
@@ -32,7 +33,18 @@ def sp_getDictionaries():
     return refDicts
 
 def sp_getTextDocument(path):
-    return Utils.testStripping(path)
+
+	words = Utils.testStripping(path)
+	result = {}
+	for word in words:
+
+		try:
+			result[word]
+			result[word] = result['word'] + 1
+		except:
+			result[word] = 1
+
+	return result
 
 def sp_getTestData():
 	testData = []
@@ -54,14 +66,9 @@ def sp_getTestData():
 
 	
 def mp_classify(params):
-	
 	id = random.random()
 	dictionaries = params['dict']
 	document = params['case']
-	
-
-	pH = 900 / (900 * 20)
-	print("Starting case: " + document['path'])
 	
 	result = {
 		'category': document['category'],
@@ -70,34 +77,46 @@ def mp_classify(params):
 	}
 	
 	for (key, category_dict) in dictionaries.items():
-		dict_words = category_dict.keys()
-	
 		
 		# Set initial probability
 		result['probabilities'][key] = 0
 		
 		# Count occurrences of word in category_dictionary
 		
-		p = pH
-		for word in document['text']:
-			if word in dict_words:
-				p += category_dict[word]
+		p = math.log(0.05) # PH = #900 / (900 * 20)
+		
+		
+		
+		for (word, occurrences) in document['text'].items():
+			
+	
+			try:
+			
+				# Try if word is in category_dictionary
+				category_dict[word]
+				
+				# TODO, better way?
+				for i in range(occurrences):
+					p += math.log(category_dict[word])
+					
+		
+				
+				print("Word: " + word + " found " + occurrences)
+				
+				
+			
+			
+			except:
+				pass
+		
 				
 		result['probabilities'][key] = p
 			
-			#nOccurrence = dict_words.count(word)
-			
-			#if nOccurrence == 0:
-			#	continue
-				
-			#result['probabilities'][key] += (category_dict[word] * nOccurrence)
-	
-	
 	return result
 
 
 def mp_start_process():
-    print 'Starting', mp.current_process().name
+    print('Starting', mp.current_process().name)
 	
 	
 def sp_handler():
@@ -106,11 +125,6 @@ def sp_handler():
 	dictionaries = sp_getDictionaries()
 
 
-	# Create process pool
-	pool = mp.Pool(
-		processes=pool_size,
-		#initializer=mp_start_process
-	)
 	
 	# Prepare imap data
 	paramData = [{
@@ -118,16 +132,56 @@ def sp_handler():
 		'dict': dictionaries
 	} for x in testData]
 	
-	for document_result in pool.imap_unordered(mp_classify, paramData):
-		print("-----------")
-		print("Category: " + document_result['category'])
-		print("Case: " + document_result['path'])
-		print("-")
+	correct = 0
+	total = 0
+	
+	
+	for param in paramData:
+		total += 1
+		document_result = mp_classify(param)
 		
 		# Order
-		ordered_prob = reversed(sorted(document_result['probabilities'].items(), key=lambda x:x[1]))
-		for i in ordered_prob:
-			print(str(i[0]) + ": " + str(i[1]))
+		ordered_prob = list(reversed(sorted(document_result['probabilities'].items(), key=lambda x:x[1])))
+		
+		
+		if ordered_prob[0][0].replace(".json", "") == document_result['category']:
+			correct += 1
+		
+		print(ordered_prob[0][0].replace(".json", "") + " == " + document_result['category'] + " | " + str(correct) + "/" + str(total) + " | " + str((correct / total) * 100.0) + "%")
+		
+		
+		#for i in ordered_prob:
+		#	print(str(i[0]) + ": " + str(i[1]))
+	
+	
+	
+	return
+	# Create process pool
+	pool = mp.Pool(
+		processes=pool_size,
+		#initializer=mp_start_process
+	)
+	
+	for document_result in pool.imap_unordered(mp_classify, paramData):
+		total += 1
+	
+		#print("-----------")
+		#print("Category: " + document_result['category'])
+		#print("Case: " + document_result['path'])
+		#print("-")
+		
+		# Order
+		ordered_prob = list(reversed(sorted(document_result['probabilities'].items(), key=lambda x:x[1])))
+		
+		
+		if ordered_prob[0][0].replace(".json", "") == document_result['category']:
+			correct += 1
+		
+		print(ordered_prob[0][0].replace(".json", "") + " == " + document_result['category'] + " | " + str(correct) + "/" + str(total) + " | " + str((correct / total) * 100.0) + "%")
+		
+		
+		#for i in ordered_prob:
+		#	print(str(i[0]) + ": " + str(i[1]))
 
 
 	

@@ -41,11 +41,17 @@ def getExampleArticlesFromSubCat(subcat):
 
 def mp_calculate(sublist, refDict, refTotal, categoryTotal, randId):
 
+	
 	result = {}
 	print("Starting: " + str(randId))
+	
 	for word in refDict:
-		nForWord = sublist.count(word)
-		result[word] = nForWord
+		try:
+			refDict[word]
+			result[word] = sublist[word]
+		except KeyError:
+			pass
+	
 	print("Done: " + str(randId))
 	return result
 
@@ -68,21 +74,52 @@ def mp_handler():
 
 
 		## Get all articles for a subcategory, take n articles, and leave n for testing.
-		item['words'] = getExampleArticlesFromSubCat('dict/%s' % (category))
+		words = getExampleArticlesFromSubCat('dict/%s' % (category))
 		
+		item['words'] = {}
+		
+		for word in words:
+			try:
+				item['words'][word]
+			except KeyError:
+				item['words'][word] = 0
+				
+			item['words'][word] = item['words'][word] + 1
+	
 		
 		data.append(item)
 		
+	
+		
+	for item in data:
+		result = mp_calculate(item['words'], referenceDict, len(referenceDict), len(words), random.random())
+	
+		# Sum up all occurences of the word in all the sublists
+		completeDict = referenceDict.copy()
+		for (key, val) in result.items():
+			completeDict[key] = completeDict[key] + val
 
 	
-	for item in data:
+		result = {}
+		for (word, occurences) in completeDict.items():
+			pForWord = (occurences + 1) / float(len(item['words']) + len(referenceDict))
+			result[word] = pForWord
+	
+	
+		# Save training data file
+		print("Saving: " + item['category'] + " which had " + str(len(words)))
+		with open( "%s.json" % (item['category']), "w" ) as outfile:
+			json.dump(result, outfile)
+
+	
+	""""for item in data:
 	
 		# Create process pool
 		pool = mp.Pool(processes=8)
 		
 		# Create X processes and input chunk of words to process
 		startTime = time.time()
-		results = [pool.apply_async(mp_calculate, args=(x, referenceDict, len(referenceDict), len(item['words']), random.random())) for x in Utils.chunks(item['words'], 8)]
+		results = [pool.apply_async(mp_calculate, args=(x, referenceDict, len(referenceDict), len(item['words']), random.random())) for x in Utils.split_dict_equally(item['words'], 8)]
 		output = [p.get() for p in results]
 		endTime = time.time() - startTime
 		print("Execution Time: " + str(endTime))
@@ -106,7 +143,7 @@ def mp_handler():
 		print("Saving: " + item['category'] + " which had " + str(len(item['words'])))
 		with open( "%s.json" % (item['category']), "w" ) as outfile:
 			json.dump(result, outfile)
-		
+		"""
 		
 		
 
