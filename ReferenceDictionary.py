@@ -18,7 +18,6 @@ def scanfolder():
 		
 		
 	# Remove duplicates
-
 	biglist = list(set(biglist))
 	bigdict = {}
 	

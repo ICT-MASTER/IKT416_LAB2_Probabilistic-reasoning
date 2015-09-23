@@ -4,6 +4,21 @@ import re
 class Utils(object):
 
 	@staticmethod
+	def split_dict_equally(input_dict, chunks=2):
+		return_list = [dict() for idx in xrange(chunks)]
+		idx = 0
+		for k,v in input_dict.iteritems():
+			return_list[idx][k] = v
+			if idx < chunks-1:  # indexes start at 0
+				idx += 1
+			else:
+				idx = 0
+				
+		return return_list
+
+
+
+	@staticmethod
 	def chunks(seq, num):
 		avg = len(seq) / float(num)
 		out = []
