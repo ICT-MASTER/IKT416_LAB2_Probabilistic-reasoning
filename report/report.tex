@@ -1,0 +1,145 @@
+\documentclass{article}
+\usepackage[english]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{fancyhdr}
+\usepackage{natbib}
+\usepackage{graphicx}
+\usepackage[]{algorithm2e}
+\usepackage[procnames]{listings}
+\usepackage{color}
+\usepackage{tikz}
+\usetikzlibrary{arrows}
+\usetikzlibrary{calc,through,backgrounds}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.8}
+
+\usepackage{tcolorbox}
+
+
+
+
+
+\pagestyle{fancy}
+\fancyhf{}
+
+%% Header %%
+\rhead{Learning Systems | IKT440}
+\lhead{Mandatory Exercise 2}
+\rfoot{Page \thepage}
+
+
+%% Front-page %%
+\title{Probalistic Reasoning \\  \large Mandatory exercise 2}
+\author{Christian Kråkevik \and Per-Arne Andersen}
+\date{September 2015}
+
+
+\begin{document}
+
+%% PYTHON HILIGHT %%
+\definecolor{keywords}{RGB}{255,0,90}
+\definecolor{comments}{RGB}{0,0,113}
+\definecolor{red}{RGB}{160,0,0}
+\definecolor{green}{RGB}{0,150,0}
+
+\lstset{language=Python,
+        basicstyle=\ttfamily\small,
+        keywordstyle=\color{keywords},
+        commentstyle=\color{comments},
+        stringstyle=\color{red},
+        showstringspaces=false,
+        identifierstyle=\color{green},
+        procnamekeys={def,class}}
+
+
+\maketitle
+
+\newpage
+
+\section{Implementation}
+We decided to implement the solution in Python. Our first goal was to solve the problem in a pseudo-like approach. After some tinkering, our purposed solution looked like this :
+\\
+
+\begin{algorithm}[H]
+  \Comment{< # A string with all words - stripped out metadata.>}
+  readAllWords(numOfTraining)\;
+  \Comment{< # A dictionary containing all words>}
+  constructReferenceDict\;
+
+ \For{numOfCategories}{
+  loadAllSubTrainingData()\;
+   \For{numOfWordsInRefDict}{
+
+    countOccurencesOfWord(x)\;
+    saveProbOfWord(x)\;
+ }
+ saveSubListDict()\;
+
+ }
+ \caption{Creating dictionaries}
+\end{algorithm}
+
+\vspace*{8px}
+
+\begin{algorithm}[H]
+
+
+  readAllWords(randomArticle)\;
+  p-old = 0\;
+  p = 0\;
+
+ \For{allSubCat}{
+     \For{wordInArticle}{
+        p + = log(subCat[wordInArticle])\;
+     }
+     \eIf{p bigger p-old}{
+      p=p-old\;
+    }{
+    p-old=p\;
+   }
+ }
+ print(p)
+ \caption{Classifying}
+\end{algorithm}
+
+\vspace*{8px}
+\newpage
+\subsection {Dictionaries}
+We read all the words from all the texts to create a referenceDictionary. This dictionary is used as a basis.
+The next step is to create a dictionary for each sub-category. This dictionary should consist of a word/p-for-word
+design, so that we can check a given word for the percentage for a given subcategory.
+
+\newline
+\noindent We achieve this by loading in all the words from all the training articles for a given category. We then strip it of
+all metadata, and identifying tags like email, numbers and so on. The next step is to iterate trough each word in our referenceDict.
+For each of the words, we count the amount of times this word exists in the list of sub-cat words. We use this variable as a basis
+for calculating the percentage for THIS word existing in THIS subcategory.
+
+\begin {lstlisting}
+pForWord = (nForWord+1)/(len(listOfWord)+len(referenceDict))
+\end{lstlisting}
+
+\newline
+
+\subsection {Classification}
+The classification is the process where we calculate the correct subclass for a given text. In our task we first loads all the
+subclasses from .json serializable objects. We now have 20 sub-category dictionaries with the probabillity for all the words. We
+then continue to read every single word of the article. The next step is to iterate trough all the words in the given text, and append
+the P value for that word to get a result. After we have done this for all the words, we move to the next subcategory. The subcategory
+with the highest P, is the one that is chosen as the most likely category.
+
+\subsection {Improvements}
+The generation of subcategory dictionaries was slow, so we decided to implement a multi-threaded solution. This was achieved by supplying
+chuncks of words to a single thread. Thus enabling us to do 8 threads and utilizing all the power from our CPU.
+
+\newline
+\noindent We also implemented a multi-threaded solution for the classification process, with 8
+different threads, enabling us to calculate 8 articles at the same time.  This worked partially, but after realizing
+that dictionaries was superior in speed as opposed to lists, we achieved a generation time of 13s instead of 5 hours.
+
+
+
+\subsection {Results}
+With a subset of 900 learning articles, times 20 categories. We achieved a percentage of 78.8234.
+
+\end{document}
